@@ -125,10 +125,11 @@ def materials():
     pat.use_nodes = True
     b = pat.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (0.008, 0.008, 0.009, 1)
-    b.inputs["Roughness"].default_value = 0.18
-    b.inputs["Coat Weight"].default_value = 1.0
-    b.inputs["Coat Roughness"].default_value = 0.03
-    b.inputs["Specular IOR Level"].default_value = 0.6
+    b.inputs["Roughness"].default_value = 0.4
+    b.inputs["Coat Weight"].default_value = 0.85
+    b.inputs["Coat Roughness"].default_value = 0.06
+    b.inputs["Coat IOR"].default_value = 1.45
+    b.inputs["Specular IOR Level"].default_value = 0.25
     sole = bpy.data.materials.get("MAT_Shoe_Sole") or bpy.data.materials.new("MAT_Shoe_Sole")
     sole.use_nodes = True
     b = sole.node_tree.nodes["Principled BSDF"]
@@ -188,7 +189,7 @@ def build_foot(side, Wc, pat, sole_m, metal, heel_h=0.086):
     tt = (ts - t0) / (t1 - t0)
     round_ = np.sqrt(np.clip(1 - ((tt - 0.5) / 0.5) ** 8, 0, 1))
     mid = 0.5 * (wl + wr)
-    half = 0.5 * (wl - wr) * round_ + 0.003 * round_
+    half = 0.5 * (wl - wr) * round_ + 0.0016 * round_
     top_z = bot - 0.0008
     # forefoot outsole touches the floor; heel seat sits at heel height
     thick = np.maximum(0.0035, np.minimum(top_z, 0.006))
@@ -308,12 +309,14 @@ def build_foot(side, Wc, pat, sole_m, metal, heel_h=0.086):
         C_[1:-1] = 0.5 * C_[1:-1] + 0.25 * (C_[:-2] + C_[2:])
     rad = (PL - C_[:, None, 0]) * np.cos(angs)[None, :] + (PZ - C_[:, None, 1]) * np.sin(angs)[None, :]
     env = rad.copy()
-    W_ = 4
+    W_ = 6
     for i_ in range(len(env)):
         env[i_] = rad[max(0, i_ - W_):i_ + W_ + 1].max(0)
-    for _ in range(10):
+    for _ in range(24):
         env[1:-1] = 0.5 * env[1:-1] + 0.25 * (env[:-2] + env[2:])
         env = 0.5 * env + 0.25 * (np.roll(env, 1, 1) + np.roll(env, -1, 1))
+    for _ in range(6):
+        C_[1:-1] = 0.5 * C_[1:-1] + 0.25 * (C_[:-2] + C_[2:])
     env = np.maximum(env, rad)
     for _ in range(2):
         env = 0.5 * env + 0.25 * (np.roll(env, 1, 1) + np.roll(env, -1, 1))
@@ -363,7 +366,7 @@ def build_foot(side, Wc, pat, sole_m, metal, heel_h=0.086):
                 kill.append(v)
     bmesh.ops.delete(bm, geom=list(set(kill)), context='VERTS')
     # relax the cut edge
-    for _ in range(6):
+    for _ in range(18):
         bnd = [v for v in bm.verts if v.is_boundary]
         newp = {}
         for v in bnd:
