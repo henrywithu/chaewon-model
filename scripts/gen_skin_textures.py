@@ -180,13 +180,19 @@ alb = alb * gain
 lum = alb @ np.array([0.2126, 0.7152, 0.0722])
 lum_s = cv2.GaussianBlur(push_pull(img(lum), valid), (0, 0), S / 128)[yy, xx]
 # reduce blotchy low-frequency contrast on the face (makeup base) while keeping fine detail
-even = 0.55 * facef + 0.25
-ratio = np.clip(np.median(lum_s[face]) / np.maximum(lum_s, 1e-4), 0.88, 1.12)
+even = 0.8 * facef + 0.3
+ratio = np.clip(np.median(lum_s[face]) / np.maximum(lum_s, 1e-4), 0.85, 1.15)
 alb = alb * (1 - even[:, None]) + alb * ratio[:, None] * even[:, None]
+
+# soften freckles / small blotches on the face (concealer): pull toward a mid-scale blur
+mid_blur = cv2.GaussianBlur(push_pull(img(alb), valid), (0, 0), S / 520)[yy, xx]
+conceal = (0.55 * facef)[:, None]
+alb = alb * (1 - conceal) + mid_blur * conceal
 
 # scalp: darken toward dark-brown hair roots so the scalp never reads as bald skin.
 # Hairline height varies around the head: forehead high, temples lower, nape lowest.
-hc = co[co[:, 2] > eye_z].mean(0)
+hv = co[(co[:, 2] > eye_z) & (np.abs(co[:, 0]) < 0.09)]
+hc = np.array([0.0, 0.5 * (hv[:, 1].min() + hv[:, 1].max()), eye_z + 0.01])   # skull centre (bbox)
 theta = np.arctan2(np.abs(X - hc[0]), -(Y - hc[1]))          # 0 = front, pi = back
 hair_z = np.interp(theta, [0.0, 0.55, 1.15, 1.6, 2.3, np.pi],
                    [eye_z + 0.078, eye_z + 0.068, eye_z + 0.035, eye_z + 0.005, eye_z - 0.07, eye_z - 0.095])
